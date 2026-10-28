@@ -98,6 +98,11 @@ body, .card, .modal-card, .form-control, .btn, .module-nav-btn, .task-item, .qua
     box-sizing: border-box;
 }
 
+html, body {
+    overflow-x: hidden;
+    max-width: 100%;
+}
+
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background-color: var(--bg-body);
@@ -132,6 +137,8 @@ html[data-theme="dark"] body {
 .app-container {
     max-width: 1040px;
     margin: 0 auto;
+    overflow-x: hidden;
+    width: 100%;
 }
 
 .app-header {
@@ -1016,6 +1023,12 @@ html[data-theme="dark"] body {
     transition: var(--transition);
 }
 
+.btn-edit-title:hover {
+    background-color: var(--primary-light);
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
 .btn-progress:hover {
     background-color: var(--bg-subtle);
     color: var(--primary);
@@ -1279,6 +1292,9 @@ html[data-theme="dark"] body {
 .focus-task-selector-card {
     padding: 1.25rem 1.5rem;
     margin-bottom: 1.5rem;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .focus-selector-header {
@@ -1320,10 +1336,24 @@ html[data-theme="dark"] body {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
 }
 
 .focus-select-wrapper {
     flex: 1;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+}
+
+#focus-task-select {
+    width: 100%;
+    max-width: 100%;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
 .btn-outline-success {
@@ -1360,6 +1390,9 @@ html[data-theme="dark"] body {
     grid-template-columns: 1.05fr 0.95fr;
     gap: 1.5rem;
     align-items: stretch;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .pomodoro-card {
@@ -1371,6 +1404,9 @@ html[data-theme="dark"] body {
     text-align: center;
     position: relative;
     overflow: hidden;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
     border-top: 4px solid var(--primary);
     transition: var(--transition);
 }
@@ -1562,6 +1598,9 @@ html[data-theme="dark"] body {
     padding: 1.5rem;
     display: flex;
     flex-direction: column;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .time-stats-header {
@@ -2290,6 +2329,125 @@ html[data-theme="dark"] body {
         margin-top: 0.25rem;
         border-top: 1px dashed var(--border-color);
     }
+
+    /* Tối ưu hóa bàn phím ảo di động (Mobile Keyboard UX & Prevent iOS/Android zoom) */
+    .form-control,
+    .search-box-input,
+    .quadrant-input,
+    .subtask-input,
+    .inline-edit-input,
+    .inline-edit-select,
+    .inline-edit-date,
+    .note-textarea,
+    select,
+    input,
+    textarea {
+        font-size: 16px !important;
+        user-select: text;
+        -webkit-user-select: text;
+        touch-action: manipulation;
+    }
+
+    /* Modal tràn màn hình & hỗ trợ cuộn khi mở bàn phím ảo */
+    .modal-overlay {
+        padding: 0.5rem;
+        align-items: center;
+        justify-content: center;
+    }
+    .modal-card {
+        max-height: 90dvh;
+        display: flex;
+        flex-direction: column;
+    }
+    .modal-body {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        flex: 1;
+    }
+    .modal-header,
+    .modal-footer {
+        flex-shrink: 0;
+    }
+}
+
+@media (max-width: 640px) {
+    /* Header & Thanh điều hướng 4 Module dạng lưới 2x2 */
+    .header-right-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.5rem;
+    }
+    .header-right-actions .module-nav {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        width: 100%;
+        gap: 0.35rem;
+        box-sizing: border-box;
+    }
+    .header-right-actions .module-nav-btn {
+        justify-content: center;
+        width: 100%;
+        padding: 0 0.5rem;
+        font-size: 0.85rem;
+        box-sizing: border-box;
+    }
+    #btn-open-cat-manager,
+    .data-menu-popover-container,
+    #btn-open-settings {
+        width: 100%;
+        display: flex;
+        min-width: 0;
+    }
+    #btn-open-cat-manager,
+    #btnToggleDataMenu,
+    #btn-open-settings {
+        width: 100%;
+        justify-content: center;
+        padding: 0 0.35rem;
+        font-size: 0.775rem;
+        white-space: nowrap;
+        box-sizing: border-box;
+    }
+
+    /* Căn chỉnh Menu Popover Dữ liệu & Bộ lọc không bị tràn mép màn hình */
+    #dataDropdownPanel,
+    .data-dropdown-panel {
+        position: fixed !important;
+        top: 135px !important;
+        left: 1rem !important;
+        right: 1rem !important;
+        width: auto !important;
+        max-width: calc(100vw - 2rem) !important;
+        box-sizing: border-box !important;
+        z-index: 10000 !important;
+    }
+
+    #filterDropdownPanel,
+    .filter-dropdown-panel {
+        position: fixed !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        left: 1rem !important;
+        right: 1rem !important;
+        width: auto !important;
+        max-width: calc(100vw - 2rem) !important;
+        max-height: 85dvh !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        box-sizing: border-box !important;
+        z-index: 10000 !important;
+    }
+
+    .settings-excel-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .settings-excel-actions .btn {
+        justify-content: center;
+        width: 100%;
+    }
 }
 
 @media (max-width: 600px) {
@@ -2352,6 +2510,29 @@ html[data-theme="dark"] body {
     .victory-actions .btn {
         width: 100%;
     }
+
+    /* Lưới Thói quen & Ghi chú trên di động hẹp */
+    .habit-cards-grid,
+    .notes-cards-grid {
+        grid-template-columns: 1fr !important;
+    }
+    .habit-toolbar-left,
+    .notes-toolbar-left {
+        min-width: 0 !important;
+        width: 100% !important;
+    }
+    .habit-filter-pills {
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+    }
+    .habit-search-wrapper,
+    .notes-search-wrapper {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
 }
 
 @media (max-width: 480px) {
@@ -2369,6 +2550,36 @@ html[data-theme="dark"] body {
     }
     .modal-footer .btn {
         width: 100%;
+    }
+
+    /* Thu gọn Pomodoro Timer & Progress Ring không bị tràn viền */
+    .pomo-timer-wrapper {
+        width: 220px !important;
+        height: 220px !important;
+        max-width: 100% !important;
+        margin: 0.25rem auto 1.25rem !important;
+    }
+    .pomo-progress-ring {
+        width: 220px !important;
+        height: 220px !important;
+        max-width: 100% !important;
+    }
+    .pomo-time-display {
+        font-size: 2.85rem !important;
+    }
+    .pomo-modes {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        gap: 0.2rem !important;
+        padding: 0.25rem !important;
+    }
+    .pomo-mode-btn {
+        justify-content: center !important;
+        padding: 0.4rem 0.2rem !important;
+        font-size: 0.72rem !important;
+        white-space: nowrap !important;
     }
 }
 
@@ -3124,16 +3335,7 @@ html[data-theme="dark"] .btn-excel:hover {
     transition: all 0.2s ease;
 }
 
-@media (max-width: 640px) {
-    .settings-excel-actions {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    .settings-excel-actions .btn {
-        justify-content: center;
-        width: 100%;
-    }
-}
+
 
 /* ==========================================================================
    BỘ LỌC GOM GỌN ĐA NĂNG (COMPACT POPOVER FILTER TOOLBAR)

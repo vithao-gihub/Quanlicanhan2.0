@@ -1175,7 +1175,13 @@ document.addEventListener('DOMContentLoaded', () => {
         li.dataset.id = String(task.id);
         li.dataset.priority = task.priority;
         li.dataset.quadrant = task.quadrant || 'q2';
-        li.setAttribute('draggable', 'true');
+
+        const isSubtaskExpanded = expandedSubtaskTaskIds.has(String(task.id));
+        if (currentViewMode === 'matrix' && !isSubtaskExpanded) {
+            li.setAttribute('draggable', 'true');
+        } else {
+            li.setAttribute('draggable', 'false');
+        }
 
         li.innerHTML = `
             <div class="task-left">
@@ -1282,6 +1288,10 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <div class="task-actions">
                 ${!isCompleted ? `
+                    <button type="button" class="btn-icon btn-edit-title" title="Sửa tên công việc">
+                        <i class="ri-edit-line"></i>
+                        <span class="action-text">Sửa</span>
+                    </button>
                     <button type="button" class="btn-icon btn-progress" title="Chuyển trạng thái: Cần làm / Đang thực hiện">
                         <i class="${task.status === 'in-progress' ? 'ri-pause-circle-line' : 'ri-play-circle-line'}"></i>
                         <span class="action-text">${task.status === 'in-progress' ? 'Đang làm' : 'Bắt đầu'}</span>
@@ -1892,8 +1902,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
-            if (updateModal.classList.contains('active')) closeUpdateModal();
-            if (categoryModal.classList.contains('active')) closeCategoryManager();
+            const uModal = document.getElementById('update-modal');
+            if (uModal && uModal.classList.contains('active') && typeof closeUpdateModal === 'function') closeUpdateModal();
+
+            const cModal = document.getElementById('category-modal');
+            if (cModal && cModal.classList.contains('active') && typeof closeCategoryManager === 'function') closeCategoryManager();
+
+            const sModal = document.getElementById('settingsModal') || document.getElementById('settings-modal');
+            if (sModal && sModal.classList.contains('active') && typeof closeSettingsModal === 'function') closeSettingsModal();
+
+            const hModal = document.getElementById('habit-modal');
+            if (hModal && hModal.classList.contains('active') && typeof closeHabitModal === 'function') closeHabitModal();
+
+            const nModal = document.getElementById('note-modal');
+            if (nModal && nModal.classList.contains('active') && typeof closeNoteModal === 'function') closeNoteModal();
         }
     });
 
@@ -2098,6 +2120,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        if (e.target.closest('.btn-edit-title')) {
+            enableInlineTitleEdit(taskItem);
+            return;
+        }
+
         if (e.target.closest('.btn-progress')) {
             tasks = tasks.map(t => (
                 String(t.id) === targetId
@@ -2120,6 +2147,69 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
+    // Hủy bỏ draggable khi người dùng bấm/focus vào ô nhập liệu để bàn phím ảo không xung đột
+    if (tasksWorkspace) {
+        tasksWorkspace.addEventListener('focusin', (e) => {
+            if (e.target && e.target.matches && e.target.matches('.subtask-input, .inline-edit-input')) {
+                const taskItem = e.target.closest('.task-item');
+                if (taskItem) {
+                    taskItem.setAttribute('draggable', 'false');
+                }
+            }
+        });
+    }
+
+    // Xử lý submit thêm việc con (.subtask-add-form)
+    if (tasksWorkspace) {
+        tasksWorkspace.addEventListener('submit', (e) => {
+            const form = e.target.closest('.subtask-add-form');
+            if (!form) return;
+            e.preventDefault();
+
+            const taskItem = form.closest('.task-item');
+            if (!taskItem || !taskItem.dataset.id) return;
+            const targetId = String(taskItem.dataset.id);
+
+            const subInput = form.querySelector('.subtask-input');
+            const title = subInput ? subInput.value.trim() : '';
+            if (!title) {
+                if (subInput) subInput.focus();
+                return;
+            }
+
+            let taskFound = false;
+            tasks = tasks.map(t => {
+                if (String(t.id) === targetId) {
+                    taskFound = true;
+                    const existingSubtasks = Array.isArray(t.subtasks) ? t.subtasks : [];
+                    return {
+                        ...t,
+                        subtasks: [
+                            ...existingSubtasks,
+                            { id: generateUniqueId('sub'), title, completed: false }
+                        ]
+                    };
+                }
+                return t;
+            });
+
+            if (taskFound) {
+                expandedSubtaskTaskIds.add(targetId);
+                saveTasksToStorage();
+                renderTasks();
+
+                // Tự động focus lại vào ô .subtask-input của task đó để nhập liên tiếp việc con trên bàn phím
+                const reloadedItem = tasksWorkspace.querySelector(`.task-item[data-id="${targetId}"]`);
+                if (reloadedItem) {
+                    const reloadedInput = reloadedItem.querySelector('.subtask-input');
+                    if (reloadedInput) {
+                        reloadedInput.focus();
+                    }
+                }
+            }
+        });
+    }
 
 
     // =========================================================================
@@ -2677,9 +2767,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const cat = getCategoryById(task.categoryId);
             const quad = getQuadrantConfig(task.quadrant);
             const spentText = task.actualTime > 0 ? ` • ⏱️ ${task.actualTime}p` : '';
+            const rawTitle = (task.title || '').trim();
+            const displayTitle = rawTitle.length > 45 ? rawTitle.substring(0, 45).trim() + '...' : rawTitle;
             const option = document.createElement('option');
             option.value = String(task.id);
-            option.textContent = `${quad.dot} [${cat.icon} ${cat.name}] ${task.title}${spentText}`;
+            option.textContent = `${quad.dot} [${cat.icon} ${cat.name}] ${displayTitle}${spentText}`;
             focusTaskSelect.appendChild(option);
         });
 
@@ -4554,7 +4646,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tags: ['Hướng dẫn', 'Hệ thống'],
             color: '#4F46E5',
             isPinned: true,
-            content: '# Chào mừng đến với Personal Workspace 2.0! 🎉\n\nỨng dụng hỗ trợ tối đa năng suất cá nhân:\n- [x] **Quản lý công việc**: Phân loại theo Ma trận Eisenhower & Tìm kiếm bộ lọc thông minh\n- [x] **Thời gian**: Pomodoro Timer, Web Audio Sound chuông báo & Web Notification\n- [x] **Thói quen**: Streak Counter điểm danh hằng ngày và dải lịch sử 7 ngày\n- [x] **Ghi chú**: Soạn thảo Markdown với trình xem trước thời gian thực\n- [x] **Spatial 3D**: Nền không gian 3D tương tác sống động bằng Three.js\n\n> Hãy tập trung vào những mục tiêu quan trọng nhất hôm nay!',
+            content: '# Chào mừng đến với Personal Workspace 2.0! 🎉\n\nỨng dụng hỗ trợ tối đa năng suất cá nhân:\n- [x] **Quản lý công việc**: Phân loại theo Ma trận Eisenhower & Tìm kiếm bộ lọc thông minh\n- [x] **Thời gian**: Pomodoro Timer, Web Audio Sound chuông báo & Web Notification\n- [x] **Thói quen**: Streak Counter điểm danh hằng ngày và dải lịch sử 7 ngày\n- [x] **Ghi chú**: Soạn thảo Markdown với trình xem trước thời gian thực\n\n> Hãy tập trung vào những mục tiêu quan trọng nhất hôm nay!',
             updatedAt: new Date().toISOString(),
             createdAt: new Date().toISOString()
         },
@@ -4571,6 +4663,20 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     let notes = loadJSONFromStorage(NOTES_STORAGE_KEY, DEFAULT_NOTES);
+
+    // Tự động làm sạch dòng Spatial 3D nếu đã lưu trong LocalStorage từ trước
+    let cleanedNotes = false;
+    notes = notes.map(n => {
+        if (n && n.content && n.content.includes('Spatial 3D')) {
+            n.content = n.content.replace(/- \[[ xX]\] \*\*Spatial 3D\*\*: [^\n]*\n?/g, '').trimEnd();
+            cleanedNotes = true;
+        }
+        return n;
+    });
+    if (cleanedNotes) {
+        saveNotesToStorage();
+    }
+
     let currentNoteFilterTag = 'all';
     let currentNoteSearch = '';
 
@@ -4606,27 +4712,55 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!mdText) return '<em style="color: var(--text-muted);">Chưa có nội dung...</em>';
         let html = escapeHTML(mdText);
 
-        // Code block
-        html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-        // Inline code
+        // 1. Khối mã Code block (trích xuất để bảo toàn thụt lề và tránh chèn <br> bên trong)
+        const codeBlocks = [];
+        html = html.replace(/```([\s\S]*?)```/g, (_, code) => {
+            const index = codeBlocks.length;
+            codeBlocks.push(`<pre><code>${code.trim()}</code></pre>`);
+            return `__CODE_BLOCK_${index}__`;
+        });
+
+        // 2. Inline code
         html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-        // Headers
+
+        // 3. Tiêu đề Headers
         html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
         html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
         html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
-        // Task checkboxes
+
+        // 4. Task checkboxes
         html = html.replace(/^- \[x\] (.*$)/gim, '<div style="display:flex;align-items:center;gap:0.35rem;"><input type="checkbox" checked disabled> <s>$1</s></div>');
         html = html.replace(/^- \[ \] (.*$)/gim, '<div style="display:flex;align-items:center;gap:0.35rem;"><input type="checkbox" disabled> <span>$1</span></div>');
-        // Bullet lists
+
+        // 5. Bullet lists: chuyển từng dòng bullet thành <li>
         html = html.replace(/^- (.*$)/gim, '<li>$1</li>');
-        html = html.replace(/(<li>.*<\/li>)/gim, '<ul>$1</ul>');
-        // Bold & Italic
+
+        // Gom các thẻ <li> liên tiếp nhau vào duy nhất 1 thẻ <ul>...</ul>
+        html = html.replace(/(?:<li>[\s\S]*?<\/li>(?:\r?\n)?)+/g, (match) => {
+            const inner = match.replace(/\r?\n/g, '');
+            return `<ul>${inner}</ul>`;
+        });
+
+        // 6. Bold & Italic
         html = html.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
         html = html.replace(/\*([^\*]+)\*/g, '<em>$1</em>');
-        // Blockquote
+
+        // 7. Blockquote
         html = html.replace(/^&gt; (.*$)/gim, '<blockquote style="border-left:3px solid var(--primary);padding-left:0.75rem;margin:0.5rem 0;color:var(--text-secondary);">$1</blockquote>');
-        // Line breaks
+
+        // 8. Chuyển đổi xuống dòng \n sang <br> và dọn dẹp <br> thừa xung quanh/bên trong block tags
         html = html.replace(/\n/g, '<br>');
+        html = html.replace(/<br>\s*(<\/?(?:h[1-3]|ul|li|blockquote|pre))/gi, '$1');
+        html = html.replace(/(<\/(?:h[1-3]|ul|blockquote|pre)>)\s*<br>/gi, '$1');
+        html = html.replace(/<ul>\s*<br>/gi, '<ul>');
+        html = html.replace(/<br>\s*<\/ul>/gi, '</ul>');
+        html = html.replace(/<\/li>\s*<br>\s*<li>/gi, '</li><li>');
+
+        // 9. Khôi phục lại các khối mã Code blocks
+        codeBlocks.forEach((block, idx) => {
+            html = html.replace(`__CODE_BLOCK_${idx}__`, block);
+        });
+
         return html;
     }
 
