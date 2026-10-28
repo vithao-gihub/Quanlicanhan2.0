@@ -291,6 +291,23 @@ html[data-theme="dark"] body {
     transition: var(--transition);
 }
 
+/* Chuẩn hóa tương tác chạm và chọn văn bản chống kẹt thao tác trên thiết bị di động */
+input,
+textarea,
+select,
+.form-control,
+.search-box-input,
+.quadrant-input,
+.subtask-input,
+.inline-edit-input,
+.inline-edit-select,
+.inline-edit-date,
+.note-textarea {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    touch-action: manipulation !important;
+}
+
 .form-control {
     width: 100%;
     height: 44px;
@@ -2343,9 +2360,9 @@ html[data-theme="dark"] body {
     input,
     textarea {
         font-size: 16px !important;
-        user-select: text;
-        -webkit-user-select: text;
-        touch-action: manipulation;
+        -webkit-user-select: text !important;
+        user-select: text !important;
+        touch-action: manipulation !important;
     }
 
     /* Modal tràn màn hình & hỗ trợ cuộn khi mở bàn phím ảo */

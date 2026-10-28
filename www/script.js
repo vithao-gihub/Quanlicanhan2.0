@@ -4,6 +4,21 @@ document.addEventListener('DOMContentLoaded', () => {
     window.__PERSONAL_WORKSPACE_INITIALIZED__ = true;
 
     // =========================================================================
+    // IME COMPOSITION GUARD (BỘ CHẶN TRẠNG THÁI SOẠN THẢO TIẾNG VIỆT TOÀN CỤC)
+    // =========================================================================
+    let isInputComposing = false;
+    document.addEventListener('compositionstart', () => {
+        isInputComposing = true;
+    });
+    document.addEventListener('compositionend', (e) => {
+        isInputComposing = false;
+        // Tự động kích hoạt lại tìm kiếm ngay khi kết thúc bộ gõ tiếng Việt có dấu
+        if (e.target && e.target.matches && e.target.matches('#search-task-input, #filterKeywordInput, #notes-search-input, #habit-search-input')) {
+            e.target.dispatchEvent(new Event('input'));
+        }
+    });
+
+    // =========================================================================
     // 1. KHAI BÁO CÁC PHẦN TỬ DOM (DOM ELEMENTS)
     // =========================================================================
     // Cài đặt, Sao lưu & Khôi phục
@@ -1278,7 +1293,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     `).join('')}
                                 </ul>
                                 <form class="subtask-add-form" novalidate>
-                                    <input type="text" class="subtask-input" placeholder="Thêm việc con mới..." required>
+                                    <input type="text" class="subtask-input" placeholder="Thêm việc con mới..." required autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
                                     <button type="submit" class="btn-add-subtask-submit" title="Thêm việc con"><i class="ri-add-line"></i></button>
                                 </form>
                             </div>
@@ -1374,6 +1389,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const existingInput = taskItem.querySelector('.inline-edit-input');
         if (existingInput) {
             existingInput.focus();
+            const len = existingInput.value.length;
+            existingInput.setSelectionRange(len, len);
             return;
         }
 
@@ -1389,10 +1406,18 @@ document.addEventListener('DOMContentLoaded', () => {
         inputEl.type = 'text';
         inputEl.className = 'inline-edit-input';
         inputEl.value = taskObj.title;
+        inputEl.setAttribute('autocomplete', 'off');
+        inputEl.setAttribute('autocorrect', 'off');
+        inputEl.setAttribute('autocapitalize', 'off');
+        inputEl.setAttribute('spellcheck', 'false');
 
         taskNameEl.replaceWith(inputEl);
         inputEl.focus();
-        inputEl.select();
+        const len = inputEl.value.length;
+        inputEl.setSelectionRange(len, len);
+
+        inputEl.addEventListener('click', e => e.stopPropagation());
+        inputEl.addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
 
         let isHandled = false;
         const saveChanges = () => {
@@ -1416,7 +1441,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.key === 'Enter') { e.preventDefault(); saveChanges(); }
             else if (e.key === 'Escape') { e.preventDefault(); cancelChanges(); }
         });
-        if (inputEl) inputEl.addEventListener('blur', saveChanges);
+        if (inputEl) inputEl.addEventListener('blur', () => {
+            setTimeout(() => {
+                if (document.activeElement === inputEl || isInputComposing) return;
+                saveChanges();
+            }, 250);
+        });
     }
 
     function enableInlineCategoryEdit(taskItem, catBadgeEl) {
@@ -1737,8 +1767,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target === categoryModal) closeCategoryManager();
     });
 
-    if (catIconInput) catIconInput.addEventListener('input', updateCategoryLivePreview);
-    if (catNameInput) catNameInput.addEventListener('input', updateCategoryLivePreview);
+    if (catIconInput) catIconInput.addEventListener('input', () => {
+        if (isInputComposing) return;
+        updateCategoryLivePreview();
+    });
+    if (catNameInput) catNameInput.addEventListener('input', () => {
+        if (isInputComposing) return;
+        updateCategoryLivePreview();
+    });
     if (catColorInput) catColorInput.addEventListener('input', updateCategoryLivePreview);
 
     if (emojiSuggestions) emojiSuggestions.addEventListener('click', (e) => {
@@ -1971,7 +2007,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Thêm nhanh công việc trực tiếp trong từng Ô Ma trận Eisenhower
     quickAddForms.forEach(qForm => {
-        if (qForm) qForm.addEventListener('submit', (e) => {
+        if (!qForm) return;
+        const qInput = qForm.querySelector('.quadrant-input');
+        if (qInput) {
+            qInput.addEventListener('click', e => e.stopPropagation());
+            qInput.addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
+        }
+
+        qForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const inputEl = qForm.querySelector('.quadrant-input');
             const title = inputEl ? inputEl.value.trim() : '';
@@ -1979,7 +2022,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!title) {
                 alert('Vui lòng nhập tên công việc!');
-                if (inputEl) inputEl.focus();
+                if (inputEl) {
+                    inputEl.focus();
+                    const len = inputEl.value.length;
+                    inputEl.setSelectionRange(len, len);
+                }
                 return;
             }
 
@@ -2031,6 +2078,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     if (tasksWorkspace) tasksWorkspace.addEventListener('click', (e) => {
+        if (e.target && e.target.matches && e.target.matches('.subtask-input, .inline-edit-input, .quadrant-input')) {
+            e.stopPropagation();
+        }
+
         const taskItem = e.target.closest('.task-item');
         if (!taskItem || !taskItem.dataset.id) return;
         const targetId = String(taskItem.dataset.id);
@@ -2148,10 +2199,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Chặn sự kiện touchstart trên các ô input trong tasksWorkspace để không bị kéo thả nhầm
+    if (tasksWorkspace) {
+        tasksWorkspace.addEventListener('touchstart', (e) => {
+            if (e.target && e.target.matches && e.target.matches('.subtask-input, .inline-edit-input, .quadrant-input')) {
+                e.stopPropagation();
+            }
+        }, { passive: true });
+    }
+
     // Hủy bỏ draggable khi người dùng bấm/focus vào ô nhập liệu để bàn phím ảo không xung đột
     if (tasksWorkspace) {
         tasksWorkspace.addEventListener('focusin', (e) => {
-            if (e.target && e.target.matches && e.target.matches('.subtask-input, .inline-edit-input')) {
+            if (e.target && e.target.matches && e.target.matches('.subtask-input, .inline-edit-input, .quadrant-input')) {
                 const taskItem = e.target.closest('.task-item');
                 if (taskItem) {
                     taskItem.setAttribute('draggable', 'false');
@@ -2174,7 +2234,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const subInput = form.querySelector('.subtask-input');
             const title = subInput ? subInput.value.trim() : '';
             if (!title) {
-                if (subInput) subInput.focus();
+                if (subInput) {
+                    subInput.focus();
+                    const len = subInput.value.length;
+                    subInput.setSelectionRange(len, len);
+                }
                 return;
             }
 
@@ -2205,6 +2269,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const reloadedInput = reloadedItem.querySelector('.subtask-input');
                     if (reloadedInput) {
                         reloadedInput.focus();
+                        const len = reloadedInput.value.length;
+                        reloadedInput.setSelectionRange(len, len);
                     }
                 }
             }
@@ -2269,6 +2335,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Tìm kiếm thời gian thực theo từ khóa
     if (searchTaskInput) {
         const handleSearch = () => {
+            if (isInputComposing) return;
             currentSearchQuery = searchTaskInput.value || '';
             updateActiveFiltersBadge();
             renderTasks(); 
@@ -4571,6 +4638,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (habitSearchInput) {
         habitSearchInput.addEventListener('input', (e) => {
+            if (isInputComposing) return;
             currentHabitSearch = e.target.value.trim();
             renderHabits();
         });
@@ -4984,6 +5052,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (notesSearchInput) {
         notesSearchInput.addEventListener('input', (e) => {
+            if (isInputComposing) return;
             currentNoteSearch = e.target.value.trim();
             renderNotes();
         });
