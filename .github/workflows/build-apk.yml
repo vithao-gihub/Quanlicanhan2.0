@@ -75,7 +75,7 @@ jobs:
         run: node sync-assets.js
 
       - name: 🏗️ Build Windows Installer and Portable EXE
-        run: npx electron-builder --win --x64
+        run: npx electron-builder --win --x64 --publish never
 
       - name: 📤 Upload Windows EXE Artifacts
         uses: actions/upload-artifact@v4
